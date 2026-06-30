@@ -1,0 +1,19 @@
+{
+  "name": "collab-editor-ws",
+  "version": "1.0.0",
+  "private": true,
+  "main": "ws-server.js",
+  "scripts": {
+    "start": "node ws-server.js",
+    "dev": "node --watch ws-server.js"
+  },
+  "dependencies": {
+    "@hocuspocus/server": "^4.3.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0",
+    "tsx": "^4.22.4",
+    "yjs": "^13.6.31"
+  }
+}
