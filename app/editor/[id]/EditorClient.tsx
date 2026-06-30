@@ -106,27 +106,6 @@ export default function EditorClient({ documentId, user }: EditorClientProps) {
       },
     });
 
-    // Hocuspocus events logs
-    provider.on("connect", () => {
-      console.log("[Provider] CONNECT");
-    });
-
-    provider.on("disconnect", () => {
-      console.log("[Provider] DISCONNECT");
-    });
-
-    provider.on("status", (event: any) => {
-      console.log("[Provider] STATUS:", event);
-    });
-
-    provider.awareness?.on("change", () => {
-      console.log("[Provider] AWARENESS CHANGE");
-    });
-
-    ydoc.on("update", () => {
-      console.log("[YDOC] UPDATE");
-    });
-
     provider.connect();
 
     const onConnect = () => setWsStatus("connected");
