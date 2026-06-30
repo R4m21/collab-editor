@@ -37,13 +37,11 @@ export async function POST(req: Request) {
   const prompt =
     action === "tone" ? PROMPTS.tone(content, tone) : PROMPTS[action](content);
 
-  // ── FIXED 1: Added 'await' before streamText ──
   const result = await streamText({
     model: groq("llama-3.3-70b-versatile"),
     prompt,
-    maxTokens: 2000,
+    maxOutputTokens: 2000,
   });
 
-  // ── FIXED 2: Switched to Vercel AI SDK Native TextStream handling ──
   return result.toTextStreamResponse();
 }
