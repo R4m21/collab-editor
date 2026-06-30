@@ -1,4 +1,4 @@
-// ── REGISTER TSX LOADER FIRST (To parse client.ts smoothly) ──
+// ── 1. REGISTER TSX LOADER FIRST (To parse client.ts smoothly) ──
 require("tsx/cjs");
 
 // Load .env from parent directory
@@ -10,17 +10,30 @@ require("dotenv").config({
 const { Server } = require("@hocuspocus/server");
 const Y = require("yjs");
 
-const clientPath = path.join(
-  __dirname,
-  "..",
-  "lib",
-  "generated",
-  "prisma",
-  "client",
-);
-const { PrismaClient } = require(clientPath);
-const { PrismaPg } = require("@prisma/adapter-pg");
-const { Pool } = require("pg");
+// ── 2. DYNAMIC PATH CHECK (Handles both custom path and standard node_modules fallback) ──
+let PrismaClient, PrismaPg, Pool;
+
+try {
+  PrismaClient = require("@prisma/client").PrismaClient;
+  PrismaPg = require("@prisma/adapter-pg").PrismaPg;
+  Pool = require("pg").Pool;
+  console.log("[WS] ✓ Loaded PrismaClient from default node_modules");
+} catch (e) {
+  const customClientPath = path.join(
+    __dirname,
+    "..",
+    "lib",
+    "generated",
+    "prisma",
+    "client",
+  );
+  PrismaClient = require(customClientPath).PrismaClient;
+  PrismaPg = require("@prisma/adapter-pg").PrismaPg;
+  Pool = require("pg").Pool;
+  console.log(
+    `[WS] ✓ Loaded PrismaClient from custom path: ${customClientPath}`,
+  );
+}
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -108,7 +121,7 @@ const server = new Server({
 server
   .listen()
   .then(() => {
-    console.log(`[WS] ✓ Hocuspocus running on ws://localhost:${PORT}`);
+    console.log(`[WS] ✓ Hocuspocus running on port:${PORT}`);
   })
   .catch((err) => {
     console.error("[WS] Fatal error state initialization:", err);
