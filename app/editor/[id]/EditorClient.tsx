@@ -106,11 +106,36 @@ export default function EditorClient({ documentId, user }: EditorClientProps) {
       },
     });
 
+    // Hocuspocus events logs
+    provider.on("connect", () => {
+      console.log("[Provider] CONNECT");
+    });
+
+    provider.on("disconnect", () => {
+      console.log("[Provider] DISCONNECT");
+    });
+
+    provider.on("status", (event: any) => {
+      console.log("[Provider] STATUS:", event);
+    });
+
+    provider.awareness?.on("change", () => {
+      console.log("[Provider] AWARENESS CHANGE");
+    });
+
+    ydoc.on("update", () => {
+      console.log("[YDOC] UPDATE");
+    });
+
     provider.connect();
 
-    provider.on("connect", () => setWsStatus("connected"));
-    provider.on("disconnect", () => setWsStatus("disconnected"));
-    provider.on("connecting", () => setWsStatus("connecting"));
+    const onConnect = () => setWsStatus("connected");
+    const onDisconnect = () => setWsStatus("disconnected");
+    const onConnecting = () => setWsStatus("connecting");
+
+    provider.on("connect", onConnect);
+    provider.on("disconnect", onDisconnect);
+    provider.on("connecting", onConnecting);
 
     const handleYjsUpdate = (update: Uint8Array) => {
       if (!navigator.onLine || wsStatus !== "connected") {
@@ -156,12 +181,14 @@ export default function EditorClient({ documentId, user }: EditorClientProps) {
       ydoc.off("update", handleYjsUpdate);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-
+      provider.off("connect", onConnect);
+      provider.off("disconnect", onDisconnect);
+      provider.off("connecting", onConnecting);
       provider.disconnect();
       provider.destroy();
       persistence.destroy();
     };
-  }, [documentId, provider, userName, userColor, user.email, wsStatus]);
+  }, [documentId, provider, userName, userColor, user.email]);
 
   // Editable Role Sync
   useEffect(() => {
