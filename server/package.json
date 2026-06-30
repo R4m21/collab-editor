@@ -4,7 +4,7 @@
   "private": true,
   "main": "ws-server.js",
   "scripts": {
-    "build": "cd .. && npx prisma generate",
+    "build": "cd .. && npx prisma generate --schema=prisma/schema.prisma",
     "start": "node ws-server.js",
     "dev": "node --watch ws-server.js"
   },
