@@ -202,15 +202,15 @@ export default function DashboardClient({ user }: { user: User }) {
       <footer className="text-center py-8 text-xs text-gray-400 border-t border-gray-100 mt-16">
         Built by{" "}
         <a
-          href="https://github.com/yourusername"
+          href="https://github.com/R4m21"
           target="_blank"
           className="hover:text-brand-500 underline"
         >
-          Your Name
+          Maniram
         </a>{" "}
         ·{" "}
         <a
-          href="https://linkedin.com/in/yourusername"
+          href="https://www.linkedin.com/in/maniram-chauhan"
           target="_blank"
           className="hover:text-brand-500 underline"
         >
@@ -218,7 +218,7 @@ export default function DashboardClient({ user }: { user: User }) {
         </a>{" "}
         ·{" "}
         <a
-          href="https://github.com/yourusername/collab-editor"
+          href="https://github.com/R4m21/collab-editor"
           target="_blank"
           className="hover:text-brand-500 underline"
         >

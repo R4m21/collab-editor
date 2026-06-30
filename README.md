@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CollabEdit — Local-First Collaborative Document Editor
 
-## Getting Started
+Real-time collaborative document editor with offline-first architecture, CRDT-based conflict resolution, and granular version control.
 
-First, run the development server:
+## Features
+
+- **Local-First Architecture** — Edit documents without any network requests. All changes persist in IndexedDB via Dexie.js.
+- **Background Sync Engine** — When back online, queued updates flush automatically to the server.
+- **CRDT Conflict Resolution** — Powered by Yjs for mathematically guaranteed, deterministic conflict-free merging.
+- **Real-Time Collaboration** — Live cursors, presence indicators, and instant sync via WebSocket (Hocuspocus).
+- **Version History** — Named snapshots with full time-travel restore that doesn't corrupt collaborators' work.
+- **Role-Based Access** — Owner / Editor / Viewer roles with server-enforced permissions.
+- **AI Assistant** — Summarize, fix grammar, expand, or rewrite content using Groq LLaMA.
+- **Security** — Payload size limits (512KB), Yjs update validation, JWT auth, route guards.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 + TypeScript |
+| Editor | TipTap v3 |
+| CRDT | Yjs + y-indexeddb |
+| Real-time | y-websocket / Hocuspocus |
+| Auth | NextAuth.js v5 |
+| Database | PostgreSQL + Prisma ORM |
+| AI | Vercel AI SDK + Groq |
+| Styling | Tailwind CSS |
+| Deploy | Vercel + Neon |
+
+## Setup
+
+### 1. Clone and install
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/R4m21/collab-editor
+cd collab-editor
+npm install
+cd server
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Configure environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Fill in `.env`:
+- `DATABASE_URL` — PostgreSQL connection string (use [Neon](https://neon.tech) for free)
+- `NEXTAUTH_SECRET` — generate with `openssl rand -base64 32`
+- `GROQ_API_KEY` — free at [console.groq.com](https://console.groq.com)
 
-## Learn More
+### 3. Database setup
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run db:generate
+npm run db:push
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 4. Run development servers
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Terminal 1 (Next.js):
+```bash
+npm run dev
+```
 
-## Deploy on Vercel
+Terminal 2 (WebSocket server):
+```bash
+cd server
+node server/ws-server.js
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Open [http://localhost:3000](http://localhost:3000)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Architecture
+
+### Local-First Flow
+
+```
+User types → TipTap → Yjs Doc → IndexedDB (instant)
+                              ↓
+                         Hocuspocus Provider (if online) → Other clients
+                              ↓
+                         REST API sync (background) → PostgreSQL
+```
+
+### Offline Sync
+
+1. User edits while offline → Yjs updates saved to IndexedDB
+2. `queueUpdate()` adds updates to IndexedDB sync queue
+3. `window.addEventListener('online')` triggers `flushSyncQueue()`
+4. Each queued update POSTed to `/api/documents/[id]/sync`
+5. Server validates (size, schema) and merges with stored Yjs state
+
+### Conflict Resolution (CRDT)
+
+Yjs uses a Conflict-free Replicated Data Type (CRDT) algorithm. Concurrent edits are merged deterministically — no matter the order updates arrive, all clients converge to the same final state. No "last write wins" data loss.
+
+### Version History
+
+Versions are Yjs state vectors (binary snapshots) stored in PostgreSQL. Restoring a version applies the snapshot as a new Yjs update — non-destructive, and syncs to all active collaborators.
+
+## Security
+
+- **Payload limits**: 512KB hard limit on sync payloads
+- **Yjs validation**: All updates tested against a real Yjs doc before applying
+- **Role enforcement**: Viewers blocked from sync endpoint server-side
+- **JWT sessions**: All API routes check authentication
+- **Prisma scoping**: All queries scoped to authenticated user's memberships
+
+## License
+
+MIT
+
+---
+
+Built by [Maniram](https://github.com/R4m21) · [LinkedIn](https://www.linkedin.com/in/maniram-chauhan)
