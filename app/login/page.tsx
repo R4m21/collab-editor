@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { FileText, Loader2, Eye, EyeOff } from "lucide-react";
 
@@ -20,6 +21,16 @@ export default function LoginPage() {
     try {
       if (mode === "register") {
         console.log("register", form);
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "Registration failed");
+          return;
+        }
       }
 
       console.log("login", form, {
@@ -27,6 +38,19 @@ export default function LoginPage() {
         password: form.password,
         redirect: false,
       });
+
+      const result = await signIn("credentials", {
+        email: form.email,
+        password: form.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Invalid email or password");
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
     } finally {
       setLoading(false);
     }
