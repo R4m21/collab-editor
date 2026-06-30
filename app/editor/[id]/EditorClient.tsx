@@ -29,10 +29,12 @@ interface EditorClientProps {
 export default function EditorClient({ documentId, user }: EditorClientProps) {
   const router = useRouter();
 
-  // ── 1. Create Yjs doc ONCE at module level (outside effects) ──────────────
-  // useMemo runs synchronously on first render — before useEditor — so
-  // ydoc is never null when TipTap's Collaboration extension reads it.
-  const ydoc = useMemo(() => new Y.Doc(), [documentId]);
+  // Stable Y.Doc
+  const ydocRef = useRef<Y.Doc | null>(null);
+  if (!ydocRef.current) {
+    ydocRef.current = new Y.Doc();
+  }
+  const ydoc = ydocRef.current;
 
   const providerRef = useRef<HocuspocusProvider | null>(null);
 
@@ -42,20 +44,23 @@ export default function EditorClient({ documentId, user }: EditorClientProps) {
   const [wsStatus, setWsStatus] = useState<
     "connecting" | "connected" | "disconnected"
   >("connecting");
+
   const [showVersions, setShowVersions] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showAI, setShowAI] = useState(false);
+
   const [wordCount, setWordCount] = useState(0);
-  const titleSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const titleSaveTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const userColor = useMemo(
     () => getColorForUser(user.id ?? user.email ?? ""),
     [user],
   );
+
   const userName = user.name ?? user.email ?? "Anonymous";
 
-  // ── 2. WebSocket provider ─────────────────────────────────────────────────
-  // Also created synchronously so CollaborationCursor has a real provider.
+  // Provider
   const provider = useMemo(() => {
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:1234";
 
@@ -63,63 +68,66 @@ export default function EditorClient({ documentId, user }: EditorClientProps) {
       url: wsUrl,
       name: documentId,
       document: ydoc,
-      connect: false,
     });
+
     providerRef.current = p;
     return p;
   }, [documentId, ydoc]);
 
-  // ── 3. TipTap editor ──────────────────────────────────────────────────────
+  // TipTap Editor
   const editor = useEditor({
-    immediatelyRender: false, // ← fixes SSR hydration warning
     extensions: [
-      StarterKit.configure({ history: false }),
+      StarterKit,
       Collaboration.configure({ document: ydoc }),
       CollaborationCaret.configure({
         provider,
         user: { name: userName, color: userColor },
       }),
-      Placeholder.configure({ placeholder: "Start writing your document…" }),
+      Placeholder.configure({
+        placeholder: "Start writing your document…",
+      }),
       CharacterCount,
     ],
-    editable: false, // set properly once role loads
+    editable: false,
     onUpdate: ({ editor }) => {
       setWordCount(editor.storage.characterCount?.words() ?? 0);
     },
   });
 
-  // ── 4. Side effects: IndexedDB, WS connect, metadata fetch ───────────────
+  // Effects (SYNC ENGINE)
   useEffect(() => {
-    // IndexedDB persistence — works fully offline
     const persistence = new IndexeddbPersistence(documentId, ydoc);
-    persistence.on("synced", () => {
-      console.log("[Editor] Loaded from IndexedDB");
+
+    provider.awareness?.setLocalState({
+      user: {
+        name: userName,
+        color: userColor,
+        email: user.email,
+      },
     });
 
-    // Set awareness then connect
-    provider.awareness.setLocalState({
-      user: { name: userName, color: userColor, email: user.email },
-    });
     provider.connect();
 
-    provider.on("status", ({ status }) => {
-      setWsStatus(status as "connecting" | "connected" | "disconnected");
-    });
+    provider.on("connect", () => setWsStatus("connected"));
+    provider.on("disconnect", () => setWsStatus("disconnected"));
+    provider.on("connecting", () => setWsStatus("connecting"));
 
-    // Queue REST updates when WS is down
     const handleYjsUpdate = (update: Uint8Array) => {
-      if (!navigator.onLine || provider.status !== "connected") {
+      if (!navigator.onLine || wsStatus !== "connected") {
         queueUpdate(documentId, update);
       }
     };
+
     ydoc.on("update", handleYjsUpdate);
 
-    // Network listeners
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+
     setIsOnline(navigator.onLine);
+
     const cleanupSync = setupNetworkListener(documentId);
 
     // Fetch document metadata + server state
@@ -148,19 +156,21 @@ export default function EditorClient({ documentId, user }: EditorClientProps) {
       ydoc.off("update", handleYjsUpdate);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+
       provider.disconnect();
       provider.destroy();
       persistence.destroy();
-      ydoc.destroy();
     };
-  }, [documentId, ydoc, provider, userName, userColor, user.email]);
+  }, [documentId, provider, userName, userColor, user.email, wsStatus]);
 
-  // ── 5. Sync editable state once role is known ─────────────────────────────
+  // Editable Role Sync
   useEffect(() => {
-    if (editor) editor.setEditable(myRole !== "VIEWER");
+    if (editor) {
+      editor.setEditable(myRole !== "VIEWER");
+    }
   }, [editor, myRole]);
 
-  // ── 6. Title autosave ─────────────────────────────────────────────────────
+  // Title Save
   const saveTitle = useCallback(
     async (title: string) => {
       await fetch(`/api/documents/${documentId}`, {
@@ -175,7 +185,11 @@ export default function EditorClient({ documentId, user }: EditorClientProps) {
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setDocTitle(val);
-    clearTimeout(titleSaveTimeout.current ?? undefined);
+
+    if (titleSaveTimeout.current) {
+      clearTimeout(titleSaveTimeout.current);
+    }
+
     titleSaveTimeout.current = setTimeout(() => saveTitle(val), 1000);
   };
 
