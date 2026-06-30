@@ -4,6 +4,7 @@
   "private": true,
   "main": "ws-server.js",
   "scripts": {
+    "build": "echo 'No compiling step required for CommonJS runtime environments'",
     "start": "node ws-server.js",
     "dev": "node --watch ws-server.js"
   },
